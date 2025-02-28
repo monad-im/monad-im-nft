@@ -11,6 +11,8 @@ contract KingOfHillTest is Test {
     address private user2 = address(0x789);
 
     function setUp() public {
+        // Deploy the contract with the owner address
+        vm.prank(owner);
         nft = new KingOfHill();
     }
 
