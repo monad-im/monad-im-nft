@@ -14,7 +14,8 @@ fi
 echo "🚀 Deploying KingOfHill contract using CREATE2 for a deterministic address..."
 
 # Deploy using Foundry with CREATE2
-DEPLOY_OUTPUT=$(forge create --rpc-url "$RPC_URL" --private-key "$PRIVATE_KEY" --create2 --salt "$SALT" src/KingOfHill.sol:KingOfHill)
+DEPLOY_OUTPUT=$(forge script script/DeployKingOfHill.s.sol --rpc-url "$RPC_URL" --private-key "$PRIVATE_KEY" --broadcast)
+# DEPLOY_OUTPUT=$(forge create --rpc-url "$RPC_URL" --private-key "$PRIVATE_KEY" --create2 --salt "$SALT" src/KingOfHill.sol:KingOfHill)
 
 # Check if deployment was successful
 if [[ $? -eq 0 ]]; then

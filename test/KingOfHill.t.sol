@@ -13,7 +13,7 @@ contract KingOfHillTest is Test {
     function setUp() public {
         // Deploy the contract with the owner address
         vm.prank(owner);
-        nft = new KingOfHill();
+        nft = new KingOfHill(owner);
     }
 
     // Test setting an image URL for a rank

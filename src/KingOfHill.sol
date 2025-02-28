@@ -18,7 +18,7 @@ contract KingOfHill is ERC721, Ownable {
     event Upgraded(address indexed source, address indexed target, uint256 points, uint256 rank);
     event RankImageSet(uint256 rank, string imageUrl);
 
-    constructor() ERC721("KingOfHill", "KOH") Ownable(msg.sender) {}
+    constructor(address initialOwner) ERC721("KingOfHill", "KOH") Ownable(initialOwner) {}
 
     // Allow the owner to set an image URL for a specific rank
     function setRankImage(uint256 rank, string memory imageUrl) public onlyOwner {
