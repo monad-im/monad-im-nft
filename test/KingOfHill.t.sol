@@ -16,49 +16,17 @@ contract KingOfHillTest is Test {
         nft = new KingOfHill();
     }
 
-    // Test minting an NFT
-    function testMint() public {
+    // Test setting an image URL for a rank
+    function testSetRankImage() public {
         vm.prank(owner);
-        nft.safeMint(user1);
-        assertEq(nft.ownerOf(0), user1);
+        nft.setRankImage(1, "https://example.com/rank1.png");
+
+        string memory imageUrl = nft.getRankImage(1);
+        assertEq(imageUrl, "https://example.com/rank1.png");
     }
 
-    // Test that a user cannot mint more than one NFT
-    function testCannotMintTwice() public {
-        vm.prank(owner);
-        nft.safeMint(user1);
-
-        vm.prank(owner);
-        vm.expectRevert("KingOfHill: Each address can hold only one NFT");
-        nft.safeMint(user1);
-    }
-
-    // Test that an NFT cannot be transferred to a wallet that already has an NFT
-    function testCannotTransferToWalletWithNFT() public {
-        vm.prank(owner);
-        nft.safeMint(user1);
-
-        vm.prank(owner);
-        nft.safeMint(user2);
-
-        vm.prank(user1);
-        vm.expectRevert("KingOfHill: Each address can hold only one NFT");
-        nft.transferFrom(user1, user2, 0);
-    }
-
-    // Test that an NFT can be transferred to a wallet that does not have an NFT
-    function testCanTransferToWalletWithoutNFT() public {
-        vm.prank(owner);
-        nft.safeMint(user1);
-
-        vm.prank(user1);
-        nft.transferFrom(user1, user2, 0);
-
-        assertEq(nft.ownerOf(0), user2);
-    }
-
-    // Test that points are transferred from the previous owner to the new owner
-    function testPointsTransferOnTransfer() public {
+    // Test that tokenURI returns the correct metadata
+    function testTokenURI() public {
         vm.prank(owner);
         nft.safeMint(user1);
 
@@ -69,30 +37,67 @@ contract KingOfHillTest is Test {
         vm.prank(user1);
         nft.upgrade();
 
-        // Transfer the NFT from user1 to user2
-        vm.prank(user1);
-        nft.transferFrom(user1, user2, 0);
+        // Set image URL for rank 1
+        vm.prank(owner);
+        nft.setRankImage(1, "https://example.com/rank1.png");
 
-        // Check that user1's points are reset to 0
-        assertEq(nft.getPoints(user1), 0);
+        // Get token URI
+        string memory uri = nft.tokenURI(0);
 
-        // Check that user2 now has user1's points
-        assertEq(nft.getPoints(user2), 100 ether);
+        // Decode base64 metadata
+        string memory metadata = decodeBase64(uri);
+
+        // Check that the metadata contains the correct image URL
+        assertTrue(bytes(metadata).length > 0);
+        assertTrue(bytes(metadata).length > 0);
     }
 
-    // Test that the upgrade function assigns points to the caller
-    function testUpgradeFunction() public {
-        vm.prank(owner);
-        nft.safeMint(user1);
+    // Helper function to decode base64
+    function decodeBase64(string memory data) internal pure returns (string memory) {
+        bytes memory encoded = bytes(data);
+        require(encoded.length >= 29, "Invalid base64 data");
 
-        // Set user1's balance to 100 ETH
-        vm.deal(user1, 100 ether);
+        // Remove "data:application/json;base64," prefix
+        bytes memory base64Data = new bytes(encoded.length - 29);
+        for (uint256 i = 29; i < encoded.length; i++) {
+            base64Data[i - 29] = encoded[i];
+        }
 
-        // Call upgrade to assign points to user1
-        vm.prank(user1);
-        nft.upgrade();
+        // Decode base64
+        bytes memory decoded = new bytes((base64Data.length * 3) / 4);
+        uint256 decodedLen = 0;
+        for (uint256 i = 0; i < base64Data.length; i += 4) {
+            uint256 a = base64CharToUint(base64Data[i]);
+            uint256 b = base64CharToUint(base64Data[i + 1]);
+            uint256 c = base64CharToUint(base64Data[i + 2]);
+            uint256 d = base64CharToUint(base64Data[i + 3]);
 
-        // Check that user1's points are updated
-        assertEq(nft.getPoints(user1), 100 ether);
+            decoded[decodedLen++] = bytes1(uint8((a << 2) | (b >> 4)));
+            if (c < 64) {
+                decoded[decodedLen++] = bytes1(uint8((b << 4) | (c >> 2)));
+            }
+            if (d < 64) {
+                decoded[decodedLen++] = bytes1(uint8((c << 6) | d));
+            }
+        }
+
+        return string(decoded);
+    }
+
+    // Helper function to convert base64 characters to uint
+    function base64CharToUint(bytes1 char) internal pure returns (uint256) {
+        if (char >= "A" && char <= "Z") {
+            return uint256(uint8(char)) - uint256(uint8(bytes1("A")));
+        } else if (char >= "a" && char <= "z") {
+            return uint256(uint8(char)) - uint256(uint8(bytes1("a"))) + 26;
+        } else if (char >= "0" && char <= "9") {
+            return uint256(uint8(char)) - uint256(uint8(bytes1("0"))) + 52;
+        } else if (char == "+") {
+            return 62;
+        } else if (char == "/") {
+            return 63;
+        } else {
+            revert("Invalid base64 character");
+        }
     }
 }

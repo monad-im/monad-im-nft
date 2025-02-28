@@ -3,17 +3,33 @@ pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/Strings.sol";
 
 contract KingOfHill is ERC721, Ownable {
+    using Strings for uint256;
+
     uint256 private _tokenIdCounter;
     mapping(address => bool) private _hasMinted; // Tracks if an address has an NFT
     mapping(address => uint256) private _points; // Tracks points for each NFT holder
     mapping(uint256 => address) private _tokenOwners; // Tracks token owners by tokenId
     address[] private _holders; // Tracks all NFT holders
+    mapping(uint256 => string) private _rankImages; // Tracks image URLs for each rank
 
     event Upgraded(address indexed source, address indexed target, uint256 points, uint256 rank);
+    event RankImageSet(uint256 rank, string imageUrl);
 
     constructor() ERC721("KingOfHill", "KOH") Ownable(msg.sender) {}
+
+    // Allow the owner to set an image URL for a specific rank
+    function setRankImage(uint256 rank, string memory imageUrl) public onlyOwner {
+        _rankImages[rank] = imageUrl;
+        emit RankImageSet(rank, imageUrl);
+    }
+
+    // Get the image URL for a specific rank
+    function getRankImage(uint256 rank) public view returns (string memory) {
+        return _rankImages[rank];
+    }
 
     function safeMint(address to) public onlyOwner {
         require(!_hasMinted[to], "KingOfHill: Each address can hold only one NFT");
@@ -97,5 +113,66 @@ contract KingOfHill is ERC721, Ownable {
     // Get all holders
     function getHolders() public view returns (address[] memory) {
         return _holders;
+    }
+
+    function _exists(uint256 tokenId) internal view returns (bool) {
+        address from = _ownerOf(tokenId);
+        return from != address(0);
+    }
+
+    // Override tokenURI to dynamically generate metadata based on rank
+    function tokenURI(uint256 tokenId) public view override returns (string memory) {
+        require(_exists(tokenId), "KingOfHill: URI query for nonexistent token");
+
+        address holder = ownerOf(tokenId);
+        uint256 rank = getRank(holder);
+        string memory imageUrl = _rankImages[rank];
+
+        // Generate metadata JSON
+        string memory metadata = string(
+            abi.encodePacked(
+                '{"name": "KingOfHill #',
+                tokenId.toString(),
+                '", "description": "KingOfHill NFT with dynamic metadata based on rank.", ',
+                '"image": "',
+                imageUrl,
+                '", "attributes": [{"trait_type": "Rank", "value": ',
+                rank.toString(),
+                "}]}"
+            )
+        );
+
+        return string(abi.encodePacked("data:application/json;base64,", base64Encode(metadata)));
+    }
+
+    // Helper function to encode metadata as base64
+    function base64Encode(string memory data) internal pure returns (string memory) {
+        bytes memory encoded = bytes(data);
+        if (encoded.length == 0) return "";
+
+        bytes memory table = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+        uint256 encodedLen = 4 * ((encoded.length + 2) / 3);
+        bytes memory result = new bytes(encodedLen);
+
+        for (uint256 i = 0; i < encoded.length; i += 3) {
+            uint256 j = i + 3 > encoded.length ? encoded.length : i + 3;
+            uint256 a = uint256(uint8(encoded[i]));
+            uint256 b = i + 1 < encoded.length ? uint256(uint8(encoded[i + 1])) : 0;
+            uint256 c = i + 2 < encoded.length ? uint256(uint8(encoded[i + 2])) : 0;
+
+            result[i / 3 * 4] = table[a >> 2];
+            result[i / 3 * 4 + 1] = table[((a & 0x03) << 4) | (b >> 4)];
+            result[i / 3 * 4 + 2] = table[((b & 0x0F) << 2) | (c >> 6)];
+            result[i / 3 * 4 + 3] = table[c & 0x3F];
+        }
+
+        // Pad with '=' if necessary
+        uint256 padding = encodedLen - (encoded.length + 2) / 3 * 4;
+        for (uint256 i = 0; i < padding; i++) {
+            result[encodedLen - 1 - i] = "=";
+        }
+
+        return string(result);
     }
 }
