@@ -31,11 +31,7 @@ contract KingOfHill is ERC721, Ownable {
     }
 
     // Override transferFrom to enforce the "one NFT per wallet" rule and transfer points
-    function transferFrom(
-        address from,
-        address to,
-        uint256 tokenId
-    ) public virtual override {
+    function transferFrom(address from, address to, uint256 tokenId) public virtual override {
         require(!_hasMinted[to], "KingOfHill: Each address can hold only one NFT");
         _hasMinted[from] = false; // Allow the sender to receive another NFT in the future
         _hasMinted[to] = true; // Mark the recipient as having an NFT
