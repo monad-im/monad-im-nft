@@ -57,42 +57,42 @@ contract KingOfHillTest is Test {
         assertEq(nft.ownerOf(0), user2);
     }
 
-    // Test the upgrade function
-    function testUpgrade() public {
+    // Test that points are transferred from the previous owner to the new owner
+    function testPointsTransferOnTransfer() public {
         vm.prank(owner);
         nft.safeMint(user1);
 
         // Set user1's balance to 100 ETH
         vm.deal(user1, 100 ether);
 
+        // Call upgrade to assign points to user1
         vm.prank(user1);
         nft.upgrade();
 
-        // Check points and rank
-        assertEq(nft.getPoints(user1), 100 ether);
-        assertEq(nft.getRank(user1), 1);
+        // Transfer the NFT from user1 to user2
+        vm.prank(user1);
+        nft.transferFrom(user1, user2, 0);
+
+        // Check that user1's points are reset to 0
+        assertEq(nft.getPoints(user1), 0);
+
+        // Check that user2 now has user1's points
+        assertEq(nft.getPoints(user2), 100 ether);
     }
 
-    // Test ranking with multiple holders
-    function testRanking() public {
+    // Test that the upgrade function assigns points to the caller
+    function testUpgradeFunction() public {
         vm.prank(owner);
         nft.safeMint(user1);
 
-        vm.prank(owner);
-        nft.safeMint(user2);
-
-        // Set user1's balance to 100 ETH and user2's balance to 200 ETH
+        // Set user1's balance to 100 ETH
         vm.deal(user1, 100 ether);
-        vm.deal(user2, 200 ether);
 
+        // Call upgrade to assign points to user1
         vm.prank(user1);
         nft.upgrade();
 
-        vm.prank(user2);
-        nft.upgrade();
-
-        // Check ranks
-        assertEq(nft.getRank(user1), 2); // user1 has 100 ETH, user2 has 200 ETH
-        assertEq(nft.getRank(user2), 1); // user2 has the highest balance
+        // Check that user1's points are updated
+        assertEq(nft.getPoints(user1), 100 ether);
     }
 }

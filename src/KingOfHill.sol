@@ -11,7 +11,7 @@ contract KingOfHill is ERC721, Ownable {
     mapping(uint256 => address) private _tokenOwners; // Tracks token owners by tokenId
     address[] private _holders; // Tracks all NFT holders
 
-    event Upgraded(address indexed holder, uint256 points, uint256 rank);
+    event Upgraded(address indexed source, address indexed target, uint256 points, uint256 rank);
 
     constructor() ERC721("KingOfHill", "KOH") Ownable(msg.sender) {}
 
@@ -25,9 +25,12 @@ contract KingOfHill is ERC721, Ownable {
 
         _tokenOwners[tokenId] = to; // Track the token owner
         _holders.push(to); // Add the holder to the list
+
+        // Calculate points based on wallet balance and assign to the caller
+        _upgrade(to, to);
     }
 
-    // Override transferFrom to enforce the "one NFT per wallet" rule
+    // Override transferFrom to enforce the "one NFT per wallet" rule and transfer points
     function transferFrom(
         address from,
         address to,
@@ -36,6 +39,10 @@ contract KingOfHill is ERC721, Ownable {
         require(!_hasMinted[to], "KingOfHill: Each address can hold only one NFT");
         _hasMinted[from] = false; // Allow the sender to receive another NFT in the future
         _hasMinted[to] = true; // Mark the recipient as having an NFT
+
+        // Transfer points from the previous owner to the new owner
+        _upgrade(from, to);
+        _points[from] = 0; // Reset points for the previous owner
 
         // Update token owner tracking
         _tokenOwners[tokenId] = to;
@@ -55,19 +62,23 @@ contract KingOfHill is ERC721, Ownable {
     function upgrade() public {
         require(balanceOf(msg.sender) > 0, "KingOfHill: Caller must own an NFT");
 
-        // Calculate points based on wallet balance
-        uint256 points = msg.sender.balance;
-        _points[msg.sender] = points;
+        // Calculate points based on wallet balance and assign to the caller
+        _upgrade(msg.sender, msg.sender);
+    }
 
-        // Calculate rank
-        uint256 rank = 1;
-        for (uint256 i = 0; i < _holders.length; i++) {
-            if (_points[_holders[i]] > points) {
-                rank++;
-            }
-        }
+    // Internal function to assign points from source to target
+    function _upgrade(address source, address target) internal {
+        uint256 points = _calculatePoints(source);
+        _points[target] = points;
 
-        emit Upgraded(msg.sender, points, rank);
+        // Emit an event with the updated points and rank
+        emit Upgraded(source, target, points, getRank(target));
+    }
+
+    // Internal function to calculate points (can be extended later)
+    function _calculatePoints(address source) internal view returns (uint256) {
+        // For now, calculate points based on wallet balance
+        return source.balance;
     }
 
     // Get points for a specific holder
