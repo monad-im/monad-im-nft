@@ -27,6 +27,10 @@ contract KingOfHillTest is Test {
 
     // Test that tokenURI returns the correct metadata
     function testTokenURI() public {
+        vm.deal(user1, 0.01 ether); // Fund user1 with 0.01 ETH
+        vm.prank(user1);
+        nft.requestMint{value: 0.01 ether}();
+
         vm.prank(owner);
         nft.safeMint(user1);
 
@@ -99,5 +103,86 @@ contract KingOfHillTest is Test {
         } else {
             revert("Invalid base64 character");
         }
+    }
+   // Test that an external wallet can request an NFT mint with a fee
+    function testRequestMint() public {
+        vm.deal(user1, 0.01 ether); // Fund user1 with 0.01 ETH
+        vm.prank(user1);
+        nft.requestMint{value: 0.01 ether}();
+
+        // Check that user1 has paid the mint fee
+        assertEq(nft.getMintFee(user1), 0.01 ether);
+
+        // Check that user1 has requested a mint
+        assertTrue(nft.hasRequestedMint(user1));
+
+        // Check that the mint fee has increased by 0.1%
+        assertEq(nft.getCurrentMintFee(), 0.01001 ether);
+    }
+
+    // Test that a wallet cannot request a mint more than once
+    function testCannotRequestMintTwice() public {
+        vm.deal(user1, 0.02 ether); // Fund user1 with 0.02 ETH
+        vm.prank(user1);
+        nft.requestMint{value: 0.01 ether}();
+
+        vm.prank(user1);
+        vm.expectRevert("KingOfHill: Each address can request a mint only once");
+        nft.requestMint{value: 0.01 ether}();
+    }
+
+    // Test that the owner can mint an NFT for a wallet that requested a mint
+    function testSafeMint() public {
+        vm.deal(user1, 0.01 ether); // Fund user1 with 0.01 ETH
+        vm.prank(user1);
+        nft.requestMint{value: 0.01 ether}();
+
+        vm.prank(owner);
+        nft.safeMint(user1);
+
+        // Check that user1 owns the NFT
+        assertEq(nft.ownerOf(0), user1);
+
+        // Check that the mint fee was transferred to the owner
+        assertEq(owner.balance, 0.01 ether);
+
+        // Check that user1's mint request status is still true
+        assertTrue(nft.hasRequestedMint(user1));
+    }
+
+    // Test that the owner can refund the mint fee
+    function testRefundMint() public {
+        vm.deal(user1, 0.01 ether); // Fund user1 with 0.01 ETH
+        vm.prank(user1);
+        nft.requestMint{value: 0.01 ether}();
+
+        // Check that the mint fee has increased by 0.1%
+        assertEq(nft.getCurrentMintFee(), 0.01001 ether);
+
+        vm.prank(owner);
+        nft.refundMint(user1);
+
+        // Check that user1 received the refund
+        assertEq(user1.balance, 0.01 ether);
+
+        // Check that user1's mint request status is reset
+        assertFalse(nft.hasRequestedMint(user1));
+
+        // Check that the mint fee is rolled back to the initial value
+        assertEq(nft.getCurrentMintFee(), 0.01 ether);
+    }
+
+    // Test that the current mint fee is readable
+    function testGetCurrentMintFee() public {
+        // Initial mint fee should be 0.01 ETH
+        assertEq(nft.getCurrentMintFee(), 0.01 ether);
+
+        // Request a mint to increase the fee
+        vm.deal(user1, 0.01 ether);
+        vm.prank(user1);
+        nft.requestMint{value: 0.01 ether}();
+
+        // Mint fee should now be 0.01001 ETH
+        assertEq(nft.getCurrentMintFee(), 0.01001 ether);
     }
 }

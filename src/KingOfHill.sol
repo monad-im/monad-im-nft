@@ -9,15 +9,22 @@ contract KingOfHill is ERC721, Ownable {
     using Strings for uint256;
 
     uint256 private _tokenIdCounter;
-    mapping(address => bool) private _hasMinted; // Tracks if an address has an NFT
+    mapping(address => bool) private _hasNFT; // Tracks if an address has an NFT
     mapping(address => uint256) private _points; // Tracks points for each NFT holder
     mapping(uint256 => address) private _tokenOwners; // Tracks token owners by tokenId
     address[] private _holders; // Tracks all NFT holders
     mapping(uint256 => string) private _rankImages; // Tracks image URLs for each rank
     address public mintWallet; // Address allowed to mint alongside the owner
+    mapping(address => uint256) private _mintFees; // Tracks mint fees paid by each wallet
+    mapping(address => bool) private _hasRequestedMint; // Tracks if a wallet has requested a mint
+    uint256 private _mintFee = 0.01 ether; // Initial mint fee
+    uint256 private constant FEE_INCREASE_PERCENTAGE = 10; // 0.1% increase (10 basis points)
 
     event Upgraded(address indexed source, address indexed target, uint256 points, uint256 rank);
     event RankImageSet(uint256 rank, string imageUrl);
+    event MintRequested(address indexed requester, uint256 tokenId, uint256 fee);
+    event MintCompleted(address indexed recipient, uint256 tokenId, uint256 fee);
+    event MintRefunded(address indexed requester, uint256 fee);
 
     constructor(address initialOwner) ERC721("KingOfHill", "KOH") Ownable(initialOwner) {}
 
@@ -41,26 +48,85 @@ contract KingOfHill is ERC721, Ownable {
         return _rankImages[rank];
     }
 
-    function safeMint(address to) public onlyOwnerOrMintWallet {
-        require(!_hasMinted[to], "KingOfHill: Each address can hold only one NFT");
-        _hasMinted[to] = true; // Mark the address as having an NFT
+    // Get the current mint fee
+    function getCurrentMintFee() public view returns (uint256) {
+        return _mintFee;
+    }
 
+    // Allow external wallets to request an NFT mint with a fee
+    function requestMint() public payable {
+        require(!_hasNFT[msg.sender], "KingOfHill: Each address can hold only one NFT");
+        require(!_hasRequestedMint[msg.sender], "KingOfHill: Each address can request a mint only once");
+        require(msg.value >= _mintFee, "KingOfHill: Insufficient mint fee");
+
+        // Mark the address as having requested a mint (permanently)
+        _hasRequestedMint[msg.sender] = true;
+
+        // Track the mint fee paid by the requester
+        _mintFees[msg.sender] = msg.value;
+
+        // Increase the mint fee by 0.1% for the next request
+        _mintFee += (_mintFee * FEE_INCREASE_PERCENTAGE) / 10000;
+
+        emit MintRequested(msg.sender, _tokenIdCounter, msg.value);
+    }
+
+    // Owner-only mint function for wallets that have requested a mint
+    function safeMint(address to) public onlyOwnerOrMintWallet {
+        require(_mintFees[to] > 0, "KingOfHill: Only wallets that requested a mint can be minted to");
+        require(!_hasNFT[to], "KingOfHill: Each address can hold only one NFT");
+
+        // Mark the address as having an NFT
+        _hasNFT[to] = true;
+
+        // Mint the NFT
         uint256 tokenId = _tokenIdCounter;
         _tokenIdCounter += 1;
         _safeMint(to, tokenId);
 
-        _tokenOwners[tokenId] = to; // Track the token owner
-        _holders.push(to); // Add the holder to the list
+        // Track the token owner
+        _tokenOwners[tokenId] = to;
+
+        // Add the holder to the list
+        _holders.push(to);
+
+        // Transfer the mint fee to the owner
+        uint256 fee = _mintFees[to];
+        payable(owner()).transfer(fee);
+
+        // Reset the mint fee for the requester
+        _mintFees[to] = 0;
 
         // Calculate points based on wallet balance and assign to the caller
         _upgrade(to, to);
+
+        emit MintCompleted(to, tokenId, fee);
+    }
+
+    // Refund the mint fee if the mint cannot be completed
+    function refundMint(address requester) public onlyOwner {
+        require(_mintFees[requester] > 0, "KingOfHill: No mint request found for this address");
+        require(!_hasNFT[requester], "KingOfHill: NFT already minted for this address");
+
+        // Refund the mint fee
+        uint256 fee = _mintFees[requester];
+        payable(requester).transfer(fee);
+
+        // Reset the mint fee and request status for the requester
+        _mintFees[requester] = 0;
+        _hasRequestedMint[requester] = false;
+
+        // Rollback the mint fee increase
+        _mintFee = (_mintFee * 10000) / (10000 + FEE_INCREASE_PERCENTAGE);
+
+        emit MintRefunded(requester, fee);
     }
 
     // Override transferFrom to enforce the "one NFT per wallet" rule and transfer points
     function transferFrom(address from, address to, uint256 tokenId) public virtual override {
-        require(!_hasMinted[to], "KingOfHill: Each address can hold only one NFT");
-        _hasMinted[from] = false; // Allow the sender to receive another NFT in the future
-        _hasMinted[to] = true; // Mark the recipient as having an NFT
+        require(!_hasNFT[to], "KingOfHill: Each address can hold only one NFT");
+        _hasNFT[from] = false; // Allow the sender to receive another NFT in the future
+        _hasNFT[to] = true; // Mark the recipient as having an NFT
 
         // Transfer points from the previous owner to the new owner
         _upgrade(from, to);
@@ -123,6 +189,21 @@ contract KingOfHill is ERC721, Ownable {
     // Get all holders
     function getHolders() public view returns (address[] memory) {
         return _holders;
+    }
+
+    // Get the mint fee paid by a specific wallet
+    function getMintFee(address wallet) public view returns (uint256) {
+        return _mintFees[wallet];
+    }
+
+    // Check if a wallet has requested a mint
+    function hasRequestedMint(address wallet) public view returns (bool) {
+        return _hasRequestedMint[wallet];
+    }
+
+    // Check if a wallet has an NFT
+    function hasNFT(address wallet) public view returns (bool) {
+        return _hasNFT[wallet];
     }
 
     function _exists(uint256 tokenId) internal view returns (bool) {
