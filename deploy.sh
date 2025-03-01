@@ -31,6 +31,8 @@ if [[ $? -eq 0 ]]; then
     else
         echo "⚠️ Deployment succeeded but could not extract contract address!"
     fi
+
+    forge inspect KingOfHill abi > KingOfHill.abi.json    
 else
     echo "❌ Deployment failed!"
     exit 1
