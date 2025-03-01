@@ -14,11 +14,21 @@ contract KingOfHill is ERC721, Ownable {
     mapping(uint256 => address) private _tokenOwners; // Tracks token owners by tokenId
     address[] private _holders; // Tracks all NFT holders
     mapping(uint256 => string) private _rankImages; // Tracks image URLs for each rank
+    address public mintWallet; // Address allowed to mint alongside the owner
 
     event Upgraded(address indexed source, address indexed target, uint256 points, uint256 rank);
     event RankImageSet(uint256 rank, string imageUrl);
 
     constructor(address initialOwner) ERC721("KingOfHill", "KOH") Ownable(initialOwner) {}
+
+    modifier onlyOwnerOrMintWallet() {
+        require(msg.sender == owner() || msg.sender == mintWallet, "Not authorized to mint");
+        _;
+    }
+
+    function setMintWallet(address _mintWallet) external onlyOwner {
+        mintWallet = _mintWallet;
+    }
 
     // Allow the owner to set an image URL for a specific rank
     function setRankImage(uint256 rank, string memory imageUrl) public onlyOwner {
@@ -31,7 +41,7 @@ contract KingOfHill is ERC721, Ownable {
         return _rankImages[rank];
     }
 
-    function safeMint(address to) public onlyOwner {
+    function safeMint(address to) public onlyOwnerOrMintWallet {
         require(!_hasMinted[to], "KingOfHill: Each address can hold only one NFT");
         _hasMinted[to] = true; // Mark the address as having an NFT
 
