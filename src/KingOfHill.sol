@@ -3,9 +3,10 @@ pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/Pausable.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 
-contract KingOfHill is ERC721, Ownable {
+contract KingOfHill is ERC721, Ownable, Pausable {
     using Strings for uint256;
 
     uint256 private _tokenIdCounter;
@@ -25,12 +26,39 @@ contract KingOfHill is ERC721, Ownable {
     event MintRequested(address indexed requester, uint256 tokenId, uint256 fee);
     event MintCompleted(address indexed recipient, uint256 tokenId, uint256 fee);
     event MintRefunded(address indexed requester, uint256 fee);
+    event FundsWithdrawn(address indexed owner, uint256 amount);
+    event MintingPaused(bool paused);
 
     constructor(address initialOwner) ERC721("KingOfHill", "KOH") Ownable(initialOwner) {}
 
     modifier onlyOwnerOrMintWallet() {
         require(msg.sender == owner() || msg.sender == mintWallet, "Not authorized to mint");
         _;
+    }
+
+    // Function to withdraw all funds from the contract (only owner)
+    function withdrawAllFunds() external onlyOwner {
+        uint256 contractBalance = address(this).balance;
+        require(contractBalance > 0, "No funds to withdraw");
+
+        // Transfer the balance to the owner
+        (bool success, ) = owner().call{value: contractBalance}("");
+        require(success, "Transfer failed");
+
+        // Emit an event to log the withdrawal
+        emit FundsWithdrawn(owner(), contractBalance);
+    }
+
+    // Function to pause minting (only owner)
+    function pauseMinting() external onlyOwner {
+        _pause();
+        emit MintingPaused(true);
+    }
+
+    // Function to unpause minting (only owner)
+    function unpauseMinting() external onlyOwner {
+        _unpause();
+        emit MintingPaused(false);
     }
 
     function setMintWallet(address _mintWallet) external onlyOwner {
@@ -54,7 +82,7 @@ contract KingOfHill is ERC721, Ownable {
     }
 
     // Allow external wallets to request an NFT mint with a fee
-    function requestMint() public payable {
+    function requestMint() public payable whenNotPaused {
         require(!_hasNFT[msg.sender], "KingOfHill: Each address can hold only one NFT");
         require(!_hasRequestedMint[msg.sender], "KingOfHill: Each address can request a mint only once");
         require(msg.value >= _mintFee, "KingOfHill: Insufficient mint fee");
@@ -72,7 +100,7 @@ contract KingOfHill is ERC721, Ownable {
     }
 
     // Owner-only mint function for wallets that have requested a mint
-    function safeMint(address to) public onlyOwnerOrMintWallet {
+    function safeMint(address to) public onlyOwnerOrMintWallet whenNotPaused {
         require(_mintFees[to] > 0, "KingOfHill: Only wallets that requested a mint can be minted to");
         require(!_hasNFT[to], "KingOfHill: Each address can hold only one NFT");
 
