@@ -11,11 +11,11 @@ if [[ -z "$PRIVATE_KEY" || -z "$RPC_URL" || -z "$SALT" ]]; then
     exit 1
 fi
 
-echo "🚀 Deploying KingOfHill contract using CREATE2 for a deterministic address..."
+echo "🚀 Deploying KingNad contract using CREATE2 for a deterministic address..."
 
 # Deploy using Foundry with CREATE2
-DEPLOY_OUTPUT=$(forge script script/DeployKingOfHill.s.sol --rpc-url "$RPC_URL" --private-key "$PRIVATE_KEY" --broadcast)
-# DEPLOY_OUTPUT=$(forge create --rpc-url "$RPC_URL" --private-key "$PRIVATE_KEY" --create2 --salt "$SALT" src/KingOfHill.sol:KingOfHill)
+DEPLOY_OUTPUT=$(forge script script/DeployKingNad.s.sol --rpc-url "$RPC_URL" --private-key "$PRIVATE_KEY" --broadcast)
+# DEPLOY_OUTPUT=$(forge create --rpc-url "$RPC_URL" --private-key "$PRIVATE_KEY" --create2 --salt "$SALT" src/KingNad.sol:KingNad)
 
 # Check if deployment was successful
 if [[ $? -eq 0 ]]; then
@@ -32,7 +32,7 @@ if [[ $? -eq 0 ]]; then
         echo "⚠️ Deployment succeeded but could not extract contract address!"
     fi
 
-    forge inspect KingOfHill abi > KingOfHill.abi.json    
+    forge inspect KingNad abi > KingNad.abi.json    
 else
     echo "❌ Deployment failed!"
     exit 1

@@ -6,7 +6,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 
-contract KingOfHill is ERC721, Ownable, Pausable {
+contract KingNad is ERC721, Ownable, Pausable {
     using Strings for uint256;
 
     uint256 private _tokenIdCounter;
@@ -15,26 +15,17 @@ contract KingOfHill is ERC721, Ownable, Pausable {
     mapping(uint256 => address) private _tokenOwners; // Tracks token owners by tokenId
     address[] private _holders; // Tracks all NFT holders
     mapping(uint256 => string) private _rankImages; // Tracks image URLs for each rank
-    address public mintWallet; // Address allowed to mint alongside the owner
-    mapping(address => uint256) private _mintFees; // Tracks mint fees paid by each wallet
-    mapping(address => bool) private _hasRequestedMint; // Tracks if a wallet has requested a mint
     uint256 private _mintFee = 0.01 ether; // Initial mint fee
     uint256 private constant FEE_INCREASE_PERCENTAGE = 10; // 0.1% increase (10 basis points)
+    mapping(address => bool) private _hasRequestedMint; // Tracks if a wallet has requested a mint
 
     event Upgraded(address indexed source, address indexed target, uint256 points, uint256 rank);
     event RankImageSet(uint256 rank, string imageUrl);
-    event MintRequested(address indexed requester, uint256 tokenId, uint256 fee);
     event MintCompleted(address indexed recipient, uint256 tokenId, uint256 fee);
-    event MintRefunded(address indexed requester, uint256 fee);
     event FundsWithdrawn(address indexed owner, uint256 amount);
     event MintingPaused(bool paused);
 
-    constructor(address initialOwner) ERC721("KingOfHill", "KOH") Ownable(initialOwner) {}
-
-    modifier onlyOwnerOrMintWallet() {
-        require(msg.sender == owner() || msg.sender == mintWallet, "Not authorized to mint");
-        _;
-    }
+    constructor(address initialOwner) ERC721("KingNad", "KNAD") Ownable(initialOwner) {}
 
     // Function to withdraw all funds from the contract (only owner)
     function withdrawAllFunds() external onlyOwner {
@@ -61,10 +52,6 @@ contract KingOfHill is ERC721, Ownable, Pausable {
         emit MintingPaused(false);
     }
 
-    function setMintWallet(address _mintWallet) external onlyOwner {
-        mintWallet = _mintWallet;
-    }
-
     // Allow the owner to set an image URL for a specific rank
     function setRankImage(uint256 rank, string memory imageUrl) public onlyOwner {
         _rankImages[rank] = imageUrl;
@@ -81,78 +68,45 @@ contract KingOfHill is ERC721, Ownable, Pausable {
         return _mintFee;
     }
 
-    // Allow external wallets to request an NFT mint with a fee
+    // Allow users to mint NFTs directly by paying the mint fee
     function requestMint() public payable whenNotPaused {
-        require(!_hasNFT[msg.sender], "KingOfHill: Each address can hold only one NFT");
-        require(!_hasRequestedMint[msg.sender], "KingOfHill: Each address can request a mint only once");
-        require(msg.value >= _mintFee, "KingOfHill: Insufficient mint fee");
+        require(!_hasRequestedMint[msg.sender], "KingNad: Each address can request a mint only once");
+        require(!_hasNFT[msg.sender], "KingNad: Each address can hold only one NFT");
+        require(msg.value >= _mintFee, "KingNad: Insufficient mint fee");
 
         // Mark the address as having requested a mint (permanently)
         _hasRequestedMint[msg.sender] = true;
 
-        // Track the mint fee paid by the requester
-        _mintFees[msg.sender] = msg.value;
-
-        // Increase the mint fee by 0.1% for the next request
-        _mintFee += (_mintFee * FEE_INCREASE_PERCENTAGE) / 10000;
-
-        emit MintRequested(msg.sender, _tokenIdCounter, msg.value);
-    }
-
-    // Owner-only mint function for wallets that have requested a mint
-    function safeMint(address to) public onlyOwnerOrMintWallet whenNotPaused {
-        require(_mintFees[to] > 0, "KingOfHill: Only wallets that requested a mint can be minted to");
-        require(!_hasNFT[to], "KingOfHill: Each address can hold only one NFT");
-
         // Mark the address as having an NFT
-        _hasNFT[to] = true;
+        _hasNFT[msg.sender] = true;
 
         // Mint the NFT
         uint256 tokenId = _tokenIdCounter;
         _tokenIdCounter += 1;
-        _safeMint(to, tokenId);
+        _safeMint(msg.sender, tokenId);
 
         // Track the token owner
-        _tokenOwners[tokenId] = to;
+        _tokenOwners[tokenId] = msg.sender;
 
         // Add the holder to the list
-        _holders.push(to);
+        _holders.push(msg.sender);
 
         // Transfer the mint fee to the owner
-        uint256 fee = _mintFees[to];
+        uint256 fee = msg.value;
         payable(owner()).transfer(fee);
 
-        // Reset the mint fee for the requester
-        _mintFees[to] = 0;
+        // Increase the mint fee by 0.1% for the next request
+        _mintFee += (_mintFee * FEE_INCREASE_PERCENTAGE) / 10000;
 
         // Calculate points based on wallet balance and assign to the caller
-        _upgrade(to, to);
+        _upgrade(msg.sender, msg.sender);
 
-        emit MintCompleted(to, tokenId, fee);
-    }
-
-    // Refund the mint fee if the mint cannot be completed
-    function refundMint(address requester) public onlyOwner {
-        require(_mintFees[requester] > 0, "KingOfHill: No mint request found for this address");
-        require(!_hasNFT[requester], "KingOfHill: NFT already minted for this address");
-
-        // Refund the mint fee
-        uint256 fee = _mintFees[requester];
-        payable(requester).transfer(fee);
-
-        // Reset the mint fee and request status for the requester
-        _mintFees[requester] = 0;
-        _hasRequestedMint[requester] = false;
-
-        // Rollback the mint fee increase
-        _mintFee = (_mintFee * 10000) / (10000 + FEE_INCREASE_PERCENTAGE);
-
-        emit MintRefunded(requester, fee);
+        emit MintCompleted(msg.sender, tokenId, fee);
     }
 
     // Override transferFrom to enforce the "one NFT per wallet" rule and transfer points
     function transferFrom(address from, address to, uint256 tokenId) public virtual override {
-        require(!_hasNFT[to], "KingOfHill: Each address can hold only one NFT");
+        require(!_hasNFT[to], "KingNad: Each address can hold only one NFT");
         _hasNFT[from] = false; // Allow the sender to receive another NFT in the future
         _hasNFT[to] = true; // Mark the recipient as having an NFT
 
@@ -176,7 +130,7 @@ contract KingOfHill is ERC721, Ownable, Pausable {
 
     // Calculate points based on wallet balance and assign rank
     function upgrade() public {
-        require(balanceOf(msg.sender) > 0, "KingOfHill: Caller must own an NFT");
+        require(balanceOf(msg.sender) > 0, "KingNad: Caller must own an NFT");
 
         // Calculate points based on wallet balance and assign to the caller
         _upgrade(msg.sender, msg.sender);
@@ -219,19 +173,14 @@ contract KingOfHill is ERC721, Ownable, Pausable {
         return _holders;
     }
 
-    // Get the mint fee paid by a specific wallet
-    function getMintFee(address wallet) public view returns (uint256) {
-        return _mintFees[wallet];
+    // Check if a wallet has an NFT
+    function hasNFT(address wallet) public view returns (bool) {
+        return _hasNFT[wallet];
     }
 
     // Check if a wallet has requested a mint
     function hasRequestedMint(address wallet) public view returns (bool) {
         return _hasRequestedMint[wallet];
-    }
-
-    // Check if a wallet has an NFT
-    function hasNFT(address wallet) public view returns (bool) {
-        return _hasNFT[wallet];
     }
 
     function _exists(uint256 tokenId) internal view returns (bool) {
@@ -241,7 +190,7 @@ contract KingOfHill is ERC721, Ownable, Pausable {
 
     // Override tokenURI to dynamically generate metadata based on rank
     function tokenURI(uint256 tokenId) public view override returns (string memory) {
-        require(_exists(tokenId), "KingOfHill: URI query for nonexistent token");
+        require(_exists(tokenId), "KingNad: URI query for nonexistent token");
 
         address holder = ownerOf(tokenId);
         uint256 rank = getRank(holder);
@@ -250,9 +199,9 @@ contract KingOfHill is ERC721, Ownable, Pausable {
         // Generate metadata JSON
         string memory metadata = string(
             abi.encodePacked(
-                '{"name": "KingOfHill #',
+                '{"name": "KingNad #',
                 tokenId.toString(),
-                '", "description": "KingOfHill NFT with dynamic metadata based on rank.", ',
+                '", "description": "KingNad NFT with dynamic metadata based on rank.", ',
                 '"image": "',
                 imageUrl,
                 '", "attributes": [{"trait_type": "Rank", "value": ',
