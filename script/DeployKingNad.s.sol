@@ -4,6 +4,7 @@ import "forge-std/Script.sol";
 
 contract DeployKingNad is Script {
     address owner = 0x71F4ca206d0466097d6017225eb4A41a35C0d757;  // Change this to the owner's address
+    address mintWallet = 0xFFB484E5024d25fc1Df3507562Ec99006EAf1D0f;  // Change this to the mintWallet's address
 
     function run() public {
         // Create the bytecode for the KingOfHill contract
@@ -20,7 +21,7 @@ contract DeployKingNad is Script {
 
         // Deploy the contract at the calculated address
         vm.startBroadcast();
-        new KingNad{salt: salt}(owner); // Deploying the contract with the specified salt
+        new KingNad{salt: salt}(owner, mintWallet); // Deploying the contract with the specified salt
         vm.stopBroadcast();
 
         console.log("Contract deployed at address:", predictedAddress);

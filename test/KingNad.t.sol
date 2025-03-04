@@ -7,13 +7,14 @@ import "../src/KingNad.sol";
 contract KingNadTest is Test {
     KingNad public kingNad;
     address public owner = address(0x123);
+    address public mintWallet = address(0x012);
     address public user1 = address(0x456);
     address public user2 = address(0x789);
 
     function setUp() public {
-        // Deploy the KingNad contract with the owner address
+        // Deploy the KingNad contract with the owner and mintWallet addresses
         vm.prank(owner);
-        kingNad = new KingNad(owner);
+        kingNad = new KingNad(owner, mintWallet);
     }
 
     // Test minting an NFT
@@ -128,5 +129,42 @@ contract KingNadTest is Test {
         // Verify that user1 no longer owns the NFT
         assertFalse(kingNad.hasNFT(user1));
         assertEq(kingNad.balanceOf(user1), 0);
+    }
+
+    // Test setting rank image by owner
+    function testSetRankImageByOwner() public {
+        string memory imageUrl = "https://example.com/rank1.png";
+        uint256 rank = 1;
+
+        // Owner sets a rank image
+        vm.prank(owner);
+        kingNad.setRankImage(rank, imageUrl);
+
+        // Verify that the rank image was set
+        assertEq(kingNad.getRankImage(rank), imageUrl);
+    }
+
+    // Test setting rank image by mintWallet
+    function testSetRankImageByMintWallet() public {
+        string memory imageUrl = "https://example.com/rank1.png";
+        uint256 rank = 1;
+
+        // mintWallet sets a rank image
+        vm.prank(mintWallet);
+        kingNad.setRankImage(rank, imageUrl);
+
+        // Verify that the rank image was set
+        assertEq(kingNad.getRankImage(rank), imageUrl);
+    }
+
+    // Test setting rank image by unauthorized address
+    function testSetRankImageByUnauthorized() public {
+        string memory imageUrl = "https://example.com/rank1.png";
+        uint256 rank = 1;
+
+        // Unauthorized user attempts to set a rank image
+        vm.prank(user1);
+        vm.expectRevert("Not authorized");
+        kingNad.setRankImage(rank, imageUrl);
     }
 }

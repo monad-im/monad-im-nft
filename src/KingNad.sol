@@ -18,6 +18,7 @@ contract KingNad is ERC721, Ownable, Pausable {
     uint256 private _mintFee = 0.01 ether; // Initial mint fee
     uint256 private constant FEE_INCREASE_PERCENTAGE = 10; // 0.1% increase (10 basis points)
     mapping(address => bool) private _hasRequestedMint; // Tracks if a wallet has requested a mint
+    address public mintWallet; // Address allowed to mint and set rank images
 
     event Upgraded(address indexed source, address indexed target, uint256 points, uint256 rank);
     event RankImageSet(uint256 rank, string imageUrl);
@@ -25,7 +26,22 @@ contract KingNad is ERC721, Ownable, Pausable {
     event FundsWithdrawn(address indexed owner, uint256 amount);
     event MintingPaused(bool paused);
 
-    constructor(address initialOwner) ERC721("KingNad", "KNAD") Ownable(initialOwner) {}
+    constructor(address initialOwner, address initialMintWallet) ERC721("KingNad", "KNAD") Ownable(initialOwner) {
+        require(initialMintWallet != address(0), "Invalid mintWallet address");
+        mintWallet = initialMintWallet;
+    }
+
+    // Modifier to allow only the owner or mintWallet to call a function
+    modifier onlyOwnerOrMintWallet() {
+        require(msg.sender == owner() || msg.sender == mintWallet, "Not authorized");
+        _;
+    }
+
+    // Function to set the mintWallet address (only owner)
+    function setMintWallet(address _mintWallet) external onlyOwner {
+        require(_mintWallet != address(0), "Invalid mintWallet address");
+        mintWallet = _mintWallet;
+    }
 
     // Function to withdraw all funds from the contract (only owner)
     function withdrawAllFunds() external onlyOwner {
@@ -52,8 +68,8 @@ contract KingNad is ERC721, Ownable, Pausable {
         emit MintingPaused(false);
     }
 
-    // Allow the owner to set an image URL for a specific rank
-    function setRankImage(uint256 rank, string memory imageUrl) public onlyOwner {
+    // Allow the owner or mintWallet to set an image URL for a specific rank
+    function setRankImage(uint256 rank, string memory imageUrl) public onlyOwnerOrMintWallet {
         _rankImages[rank] = imageUrl;
         emit RankImageSet(rank, imageUrl);
     }
