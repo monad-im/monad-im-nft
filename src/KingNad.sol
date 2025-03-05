@@ -28,7 +28,7 @@ contract KingNad is ERC721, Ownable, Pausable {
     event FundsWithdrawn(address indexed owner, uint256 amount);
     event MintingPaused(bool paused);
 
-    constructor(address initialOwner, address initialMintWallet) ERC721("KingNad_Beta", "KNADB") Ownable(initialOwner) {
+    constructor(address initialOwner, address initialMintWallet) ERC721("KingNad", "KNAD") Ownable(initialOwner) {
         require(initialMintWallet != address(0), "Invalid mintWallet address");
         mintWallet = initialMintWallet;
     }
@@ -187,6 +187,11 @@ contract KingNad is ERC721, Ownable, Pausable {
 
     // Get rank for a specific holder
     function getRank(address holder) public view returns (uint256) {
+        // If the holder doesn't exist or has no points, return rank 0
+        if (!_hasNFT[holder] || _points[holder] == 0) {
+            return 0;
+        }
+
         uint256 points = _points[holder];
         uint256 rank = 1;
         for (uint256 i = 0; i < _holders.length; i++) {
