@@ -15,6 +15,7 @@ contract KingNad is ERC721, Ownable, Pausable {
     mapping(uint256 => address) private _tokenOwners; // Tracks token owners by tokenId
     address[] private _holders; // Tracks all NFT holders
     mapping(uint256 => string) private _rankImages; // Tracks image URLs for each rank
+    mapping(uint256 => string) private _rankMetadata; // Tracks metadata URLs for each rank
     uint256 private _mintFee = 0.01 ether; // Initial mint fee
     uint256 private constant FEE_INCREASE_PERCENTAGE = 10; // 0.1% increase (10 basis points)
     mapping(address => bool) private _hasRequestedMint; // Tracks if a wallet has requested a mint
@@ -22,11 +23,12 @@ contract KingNad is ERC721, Ownable, Pausable {
 
     event Upgraded(address indexed source, address indexed target, uint256 points, uint256 rank);
     event RankImageSet(uint256 rank, string imageUrl);
+    event RankMetadataSet(uint256 rank, string metadataUrl);
     event MintCompleted(address indexed recipient, uint256 tokenId, uint256 fee);
     event FundsWithdrawn(address indexed owner, uint256 amount);
     event MintingPaused(bool paused);
 
-    constructor(address initialOwner, address initialMintWallet) ERC721("KingNad", "KNAD") Ownable(initialOwner) {
+    constructor(address initialOwner, address initialMintWallet) ERC721("KingNad_Beta", "KNADB") Ownable(initialOwner) {
         require(initialMintWallet != address(0), "Invalid mintWallet address");
         mintWallet = initialMintWallet;
     }
@@ -74,9 +76,20 @@ contract KingNad is ERC721, Ownable, Pausable {
         emit RankImageSet(rank, imageUrl);
     }
 
+    // Allow the owner or mintWallet to set a metadata URL for a specific rank
+    function setRankMetadata(uint256 rank, string memory metadataUrl) public onlyOwnerOrMintWallet {
+        _rankMetadata[rank] = metadataUrl;
+        emit RankMetadataSet(rank, metadataUrl);
+    }
+
     // Get the image URL for a specific rank
     function getRankImage(uint256 rank) public view returns (string memory) {
         return _rankImages[rank];
+    }
+
+    // Get the metadata URL for a specific rank
+    function getRankMetadata(uint256 rank) public view returns (string memory) {
+        return _rankMetadata[rank];
     }
 
     // Get the current mint fee
@@ -204,59 +217,16 @@ contract KingNad is ERC721, Ownable, Pausable {
         return from != address(0);
     }
 
-    // Override tokenURI to dynamically generate metadata based on rank
+    // Override tokenURI to return the metadata URL based on rank
     function tokenURI(uint256 tokenId) public view override returns (string memory) {
         require(_exists(tokenId), "KingNad: URI query for nonexistent token");
 
         address holder = ownerOf(tokenId);
         uint256 rank = getRank(holder);
-        string memory imageUrl = _rankImages[rank];
+        string memory metadataUrl = _rankMetadata[rank];
 
-        // Generate metadata JSON
-        string memory metadata = string(
-            abi.encodePacked(
-                '{"name": "KingNad #',
-                tokenId.toString(),
-                '", "description": "KingNad NFT with dynamic metadata based on rank.", ',
-                '"image": "',
-                imageUrl,
-                '", "attributes": [{"trait_type": "Rank", "value": ',
-                rank.toString(),
-                "}]}"
-            )
-        );
+        require(bytes(metadataUrl).length > 0, "KingNad: Metadata URL not set for this rank");
 
-        return string(abi.encodePacked("data:application/json;base64,", base64Encode(metadata)));
-    }
-
-    // Helper function to encode metadata as base64
-    function base64Encode(string memory data) internal pure returns (string memory) {
-        bytes memory encoded = bytes(data);
-        if (encoded.length == 0) return "";
-
-        bytes memory table = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-
-        uint256 encodedLen = 4 * ((encoded.length + 2) / 3);
-        bytes memory result = new bytes(encodedLen);
-
-        for (uint256 i = 0; i < encoded.length; i += 3) {
-            uint256 j = i + 3 > encoded.length ? encoded.length : i + 3;
-            uint256 a = uint256(uint8(encoded[i]));
-            uint256 b = i + 1 < encoded.length ? uint256(uint8(encoded[i + 1])) : 0;
-            uint256 c = i + 2 < encoded.length ? uint256(uint8(encoded[i + 2])) : 0;
-
-            result[i / 3 * 4] = table[a >> 2];
-            result[i / 3 * 4 + 1] = table[((a & 0x03) << 4) | (b >> 4)];
-            result[i / 3 * 4 + 2] = table[((b & 0x0F) << 2) | (c >> 6)];
-            result[i / 3 * 4 + 3] = table[c & 0x3F];
-        }
-
-        // Pad with '=' if necessary
-        uint256 padding = encodedLen - (encoded.length + 2) / 3 * 4;
-        for (uint256 i = 0; i < padding; i++) {
-            result[encodedLen - 1 - i] = "=";
-        }
-
-        return string(result);
+        return metadataUrl;
     }
 }
