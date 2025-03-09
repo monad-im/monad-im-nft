@@ -3,6 +3,15 @@ pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
 import "../src/KingNad.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+
+contract MockERC20 is ERC20 {
+    constructor(string memory name, string memory symbol) ERC20(name, symbol) {}
+
+    function mint(address to, uint256 amount) public {
+        _mint(to, amount);
+    }
+}
 
 contract KingNadTest is Test {
     KingNad public kingNad;
@@ -10,11 +19,27 @@ contract KingNadTest is Test {
     address public mintWallet = address(0x012);
     address public user1 = address(0x456);
     address public user2 = address(0x789);
+    MockERC20 public token1;
+    MockERC20 public token2;
 
     function setUp() public {
         // Deploy the KingNad contract with the owner and mintWallet addresses
         vm.prank(owner);
         kingNad = new KingNad(owner, mintWallet);
+
+        // Deploy mock ERC20 tokens
+        token1 = new MockERC20("Token1", "TKN1");
+        token2 = new MockERC20("Token2", "TKN2");
+
+        // Add ERC20 tokens to the KingNad contract
+        vm.prank(owner);
+        kingNad.addERC20Token(address(token1), 100); // 100x multiplier for token1
+        vm.prank(owner);
+        kingNad.addERC20Token(address(token2), 50);  // 50x multiplier for token2
+
+        // Set native balance coefficient
+        vm.prank(owner);
+        kingNad.setNativeBalanceCoefficient(10); // 10x multiplier for native balance
     }
 
     // Test minting an NFT
@@ -49,27 +74,6 @@ contract KingNadTest is Test {
         vm.expectRevert("KingNad: Each address can request a mint only once");
         kingNad.requestMint{value: initialMintFee}();
     }
-
-    // // Test withdrawing funds by the owner
-    // function testWithdrawFunds() public {
-    //     vm.deal(user1, 1 ether); // Give user1 some Ether
-    //     uint256 initialMintFee = kingNad.getCurrentMintFee();
-
-    //     // User1 requests a mint
-    //     vm.prank(user1);
-    //     kingNad.requestMint{value: initialMintFee}();
-
-    //     // Owner withdraws funds
-    //     uint256 contractBalanceBefore = address(kingNad).balance;
-    //     vm.prank(owner);
-    //     kingNad.withdrawAllFunds();
-
-    //     // Verify that the contract balance is now 0
-    //     assertEq(address(kingNad).balance, 0);
-
-    //     // Verify that the owner received the funds
-    //     assertEq(owner.balance, contractBalanceBefore);
-    // }
 
     // Test pausing and unpausing minting
     function testPauseUnpauseMinting() public {
@@ -166,5 +170,20 @@ contract KingNadTest is Test {
         vm.prank(user1);
         vm.expectRevert("Not authorized");
         kingNad.setRankImage(rank, imageUrl);
+    }
+
+    // Test points calculation with native balance and ERC20 tokens
+    function testPointsCalculation() public {
+        vm.deal(user1, 1 ether); // Give user1 1 ETH
+        token1.mint(user1, 100); // Give user1 100 token1
+        token2.mint(user1, 200); // Give user1 200 token2
+
+        // User1 requests a mint
+        vm.prank(user1);
+        kingNad.requestMint{value: kingNad.getCurrentMintFee()}();
+
+        // Calculate expected points
+        uint256 expectedPoints = (1 ether * 10) + (100 * 100) + (200 * 50);
+        assertEq(kingNad.getPoints(user1), expectedPoints);
     }
 }
