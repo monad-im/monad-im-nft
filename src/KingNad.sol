@@ -6,6 +6,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 
 contract KingNad is ERC721, Ownable, Pausable {
     using Strings for uint256;
@@ -25,16 +26,22 @@ contract KingNad is ERC721, Ownable, Pausable {
     // ERC20 token list and coefficients
     address[] private _erc20Tokens; // List of ERC20 tokens to consider for points
     mapping(address => uint256) private _erc20Coefficients; // Coefficients for ERC20 tokens
+
+    // ERC721 token list and coefficients
+    address[] private _erc721Tokens; // List of ERC721 tokens to consider for points
+    mapping(address => uint256) private _erc721Coefficients; // Coefficients for ERC721 tokens
+
     uint256 private _nativeBalanceCoefficient; // Coefficient for native balance
 
     event Upgraded(address indexed source, address indexed target, uint256 points, uint256 rank);
     event RankImageSet(uint256 rank, string imageUrl);
     event RankMetadataSet(uint256 rank, string metadataUrl);
     event MintCompleted(address indexed recipient, uint256 tokenId, uint256 fee);
-    event FundsWithdrawn(address indexed owner, uint256 amount);
     event MintingPaused(bool paused);
     event ERC20TokenAdded(address indexed token, uint256 coefficient);
     event ERC20TokenRemoved(address indexed token);
+    event ERC721TokenAdded(address indexed token, uint256 coefficient);
+    event ERC721TokenRemoved(address indexed token);
     event NativeBalanceCoefficientUpdated(uint256 coefficient);
 
     constructor(address initialOwner, address initialMintWallet) ERC721("KingNad", "KNAD") Ownable(initialOwner) {
@@ -53,19 +60,6 @@ contract KingNad is ERC721, Ownable, Pausable {
     function setMintWallet(address _mintWallet) external onlyOwner {
         require(_mintWallet != address(0), "Invalid mintWallet address");
         mintWallet = _mintWallet;
-    }
-
-    // Function to withdraw all funds from the contract (only owner)
-    function withdrawAllFunds() external onlyOwner {
-        uint256 contractBalance = address(this).balance;
-        require(contractBalance > 0, "No funds to withdraw");
-
-        // Transfer the balance to the owner
-        (bool success, ) = owner().call{value: contractBalance}("");
-        require(success, "Transfer failed");
-
-        // Emit an event to log the withdrawal
-        emit FundsWithdrawn(owner(), contractBalance);
     }
 
     // Function to pause minting (only owner)
@@ -199,6 +193,14 @@ contract KingNad is ERC721, Ownable, Pausable {
             points += balance * coefficient;
         }
 
+        // Add ERC721 token balances contribution
+        for (uint256 i = 0; i < _erc721Tokens.length; i++) {
+            address token = _erc721Tokens[i];
+            uint256 balance = IERC721(token).balanceOf(source);
+            uint256 coefficient = _erc721Coefficients[token];
+            points += balance * coefficient;
+        }
+
         return points;
     }
 
@@ -292,6 +294,36 @@ contract KingNad is ERC721, Ownable, Pausable {
         emit ERC20TokenRemoved(token);
     }
 
+    // Add an ERC721 token to the list (only owner)
+    function addERC721Token(address token, uint256 coefficient) external onlyOwner {
+        require(token != address(0), "Invalid token address");
+        require(coefficient > 0, "Coefficient must be greater than 0");
+
+        _erc721Tokens.push(token);
+        _erc721Coefficients[token] = coefficient;
+
+        emit ERC721TokenAdded(token, coefficient);
+    }
+
+    // Remove an ERC721 token from the list (only owner)
+    function removeERC721Token(address token) external onlyOwner {
+        require(token != address(0), "Invalid token address");
+
+        // Remove the token from the list
+        for (uint256 i = 0; i < _erc721Tokens.length; i++) {
+            if (_erc721Tokens[i] == token) {
+                _erc721Tokens[i] = _erc721Tokens[_erc721Tokens.length - 1];
+                _erc721Tokens.pop();
+                break;
+            }
+        }
+
+        // Remove the coefficient
+        delete _erc721Coefficients[token];
+
+        emit ERC721TokenRemoved(token);
+    }
+
     // Update the native balance coefficient (only owner)
     function setNativeBalanceCoefficient(uint256 coefficient) external onlyOwner {
         require(coefficient > 0, "Coefficient must be greater than 0");
@@ -309,6 +341,16 @@ contract KingNad is ERC721, Ownable, Pausable {
     // Get the coefficient for a specific ERC20 token
     function getERC20Coefficient(address token) public view returns (uint256) {
         return _erc20Coefficients[token];
+    }
+
+    // Get the list of ERC721 tokens
+    function getERC721Tokens() public view returns (address[] memory) {
+        return _erc721Tokens;
+    }
+
+    // Get the coefficient for a specific ERC721 token
+    function getERC721Coefficient(address token) public view returns (uint256) {
+        return _erc721Coefficients[token];
     }
 
     // Get the native balance coefficient

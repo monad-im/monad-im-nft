@@ -2,14 +2,26 @@
 pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
+import "forge-std/console.sol";
+
 import "../src/KingNad.sol";
+
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 
 contract MockERC20 is ERC20 {
     constructor(string memory name, string memory symbol) ERC20(name, symbol) {}
 
     function mint(address to, uint256 amount) public {
         _mint(to, amount);
+    }
+}
+
+contract MockERC721 is ERC721 {
+    constructor(string memory name, string memory symbol) ERC721(name, symbol) {}
+
+    function mint(address to, uint256 tokenId) public {
+        _mint(to, tokenId);
     }
 }
 
@@ -21,21 +33,25 @@ contract KingNadTest is Test {
     address public user2 = address(0x789);
     MockERC20 public token1;
     MockERC20 public token2;
+    MockERC721 public erc721Token1;
 
     function setUp() public {
         // Deploy the KingNad contract with the owner and mintWallet addresses
         vm.prank(owner);
         kingNad = new KingNad(owner, mintWallet);
 
-        // Deploy mock ERC20 tokens
+        // Deploy mock ERC20 and ERC721 tokens
         token1 = new MockERC20("Token1", "TKN1");
         token2 = new MockERC20("Token2", "TKN2");
+        erc721Token1 = new MockERC721("ERC721Token1", "NFT1");
 
-        // Add ERC20 tokens to the KingNad contract
+        // Add ERC20 and ERC721 tokens to the KingNad contract
         vm.prank(owner);
         kingNad.addERC20Token(address(token1), 100); // 100x multiplier for token1
         vm.prank(owner);
         kingNad.addERC20Token(address(token2), 50);  // 50x multiplier for token2
+        vm.prank(owner);
+        kingNad.addERC721Token(address(erc721Token1), 500); // 500x multiplier for each ERC721 token1
 
         // Set native balance coefficient
         vm.prank(owner);
@@ -68,6 +84,9 @@ contract KingNadTest is Test {
         // User1 requests a mint
         vm.prank(user1);
         kingNad.requestMint{value: initialMintFee}();
+
+        vm.prank(user1);
+        kingNad.transferFrom(user1, user2, 0);
 
         // Attempt to mint again with the same wallet
         vm.prank(user1);
@@ -173,17 +192,37 @@ contract KingNadTest is Test {
     }
 
     // Test points calculation with native balance and ERC20 tokens
-    function testPointsCalculation() public {
+    function testPointsCalculationERC20() public {
+        // User1 requests a mint
         vm.deal(user1, 1 ether); // Give user1 1 ETH
         token1.mint(user1, 100); // Give user1 100 token1
         token2.mint(user1, 200); // Give user1 200 token2
 
         // User1 requests a mint
+        uint256 mintFee = kingNad.getCurrentMintFee();
         vm.prank(user1);
-        kingNad.requestMint{value: kingNad.getCurrentMintFee()}();
+        kingNad.requestMint{value: mintFee}();
 
         // Calculate expected points
-        uint256 expectedPoints = (1 ether * 10) + (100 * 100) + (200 * 50);
+        uint256 nativeBalanceAfterMint = 1 ether - mintFee;
+        uint256 expectedPoints = (nativeBalanceAfterMint * 10) + (100 * 100) + (200 * 50);
+        assertEq(kingNad.getPoints(user1), expectedPoints);
+    }
+
+    // Test points calculation with native balance, ERC20 tokens, and ERC721 tokens
+    function testPointsCalculationERC721() public {
+        vm.deal(user1, 1 ether); // Give user1 1 ETH
+        token1.mint(user1, 100); // Give user1 100 token1
+        erc721Token1.mint(user1, 1); // Give user1 1 ERC721 token1
+
+        // User1 requests a mint
+        uint256 mintFee = kingNad.getCurrentMintFee();
+        vm.prank(user1);
+        kingNad.requestMint{value: mintFee}();
+
+        // Calculate expected points
+        uint256 nativeBalanceAfterMint = 1 ether - mintFee;
+        uint256 expectedPoints = (nativeBalanceAfterMint * 10) + (100 * 100) + (1 * 500);
         assertEq(kingNad.getPoints(user1), expectedPoints);
     }
 }
