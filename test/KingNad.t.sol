@@ -49,7 +49,7 @@ contract KingNadTest is Test {
         vm.prank(owner);
         kingNad.addERC20Token(address(token1), 100); // 100x multiplier for token1
         vm.prank(owner);
-        kingNad.addERC20Token(address(token2), 50);  // 50x multiplier for token2
+        kingNad.addERC20Token(address(token2), 50); // 50x multiplier for token2
         vm.prank(owner);
         kingNad.addERC721Token(address(erc721Token1), 500); // 500x multiplier for each ERC721 token1
 
