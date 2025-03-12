@@ -1,5 +1,81 @@
+/**
+ * @title KingNad
+ * @dev An ERC721 NFT contract with ranking system based on wallet assets
+ *
+ * KingNad implements a unique NFT system where:
+ * - Each wallet can mint or hold only one NFT
+ * - NFT holders are ranked based on their wallet assets (native balance, ERC20, and * @dev An ERC721 NFT contract with unique ranking system based on wallet assets
+ * 
+ * The KingNad NFT implements a specialized ranking system where each holder's rank
+ * is determined by the value of assets in their wallet. Points are calculated based on:
+ * - Native token balance (ETH/MATIC/etc.)
+ * - ERC20 token balances (weighted by configurable coefficients)
+ * - ERC721 token holdings (weighted by configurable coefficients)
+ *
+ * Key features:
+ * - One NFT per wallet enforcement
+ * - Dynamic mint fee that increases by 0.1% with each mint
+ * - Ranking system based on wallet assets
+ * - Metadata and images that change based on holder's rank
+ * - Transfer restrictions to maintain one NFT per wallet rule
+ *
+ * The contract allows the owner and designated mintWallet to:
+ * - Set rank-specific images and metadata
+ * - Add/remove supported ERC20 and ERC721 tokens for points calculation
+ * - Configure coefficients for different assets in points calculation
+ * - Pause/unpause minting process
+ *
+ * For end users:
+ * - Request to mint an NFT by paying the current fee
+ * - Update their rank by calling the upgrade function
+ * - Transfer NFTs subject to the one-per-wallet restriction
+ *
+ * Points and ranks are recalculated during transfers and can be manually updated.
+ *
+ * Note: This contract is for educational purposes only and not suitable for production.
+ * Visit https://kingnad.xyz for more information.
+ */
+
+/**
+ * Storage:
+ * @notice _tokenIdCounter - Tracks the next token ID to mint
+ * @notice _hasNFT - Mapping to track if an address has an NFT
+ * @notice _points - Mapping to track points for each NFT holder
+ * @notice _tokenOwners - Mapping to track token owners by tokenId
+ * @notice _holders - Array to track all NFT holders
+ * @notice _rankImages - Mapping to track image URLs for each rank
+ * @notice _rankMetadata - Mapping to track metadata URLs for each rank
+ * @notice _mintFee - The current mint fee (starts at 0.01 ETH, increases by 0.1% per mint)
+ * @notice _hasRequestedMint - Mapping to track if a wallet has requested a mint
+ * @notice mintWallet - Address allowed to mint and set rank images
+ * @notice _erc20Tokens - List of ERC20 tokens to consider for points calculation
+ * @notice _erc20Coefficients - Coefficients for ERC20 tokens in points calculation
+ * @notice _erc721Tokens - List of ERC721 tokens to consider for points calculation
+ * @notice _erc721Coefficients - Coefficients for ERC721 tokens in points calculation
+ * @notice _nativeBalanceCoefficient - Coefficient for native balance in points calculation
+ * 
+ * Events:
+ * @notice Upgraded - Emitted when a holder's points and rank are updated
+ * @notice RankImageSet - Emitted when an image URL is set for a rank
+ * @notice RankMetadataSet - Emitted when a metadata URL is set for a rank
+ * @notice MintCompleted - Emitted when an NFT is minted
+ * @notice MintingPaused - Emitted when minting is paused or unpaused
+ * @notice ERC20TokenAdded - Emitted when an ERC20 token is added to the points system
+ * @notice ERC20TokenRemoved - Emitted when an ERC20 token is removed from the points system
+ * @notice ERC721TokenAdded - Emitted when an ERC721 token is added to the points system
+ * @notice ERC721TokenRemoved - Emitted when an ERC721 token is removed from the points system
+ * @notice NativeBalanceCoefficientUpdated - Emitted when the native balance coefficient is updated
+ */
+
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
+
+/**
+ * This code is create for the KingNads NFT project.
+ * For educational purposes only! 
+ * Not suitable for production.
+ * Explore more on https://kingnad.xyz
+ */
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
