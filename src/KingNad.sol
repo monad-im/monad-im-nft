@@ -5,7 +5,7 @@
  * KingNad implements a unique NFT system where:
  * - Each wallet can mint or hold only one NFT
  * - NFT holders are ranked based on their wallet assets (native balance, ERC20, and * @dev An ERC721 NFT contract with unique ranking system based on wallet assets
- * 
+ *
  * The KingNad NFT implements a specialized ranking system where each holder's rank
  * is determined by the value of assets in their wallet. Points are calculated based on:
  * - Native token balance (ETH/MATIC/etc.)
@@ -53,7 +53,7 @@
  * @notice _erc721Tokens - List of ERC721 tokens to consider for points calculation
  * @notice _erc721Coefficients - Coefficients for ERC721 tokens in points calculation
  * @notice _nativeBalanceCoefficient - Coefficient for native balance in points calculation
- * 
+ *
  * Events:
  * @notice Upgraded - Emitted when a holder's points and rank are updated
  * @notice RankImageSet - Emitted when an image URL is set for a rank
@@ -72,11 +72,10 @@ pragma solidity ^0.8.0;
 
 /**
  * This code is create for the KingNads NFT project.
- * For educational purposes only! 
+ * For educational purposes only!
  * Not suitable for production.
  * Explore more on https://kingnad.xyz
  */
-
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
